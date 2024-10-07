@@ -38,31 +38,39 @@ def get_postgresql_tags(file_name: str) -> list:
 
 @xml_handle_element('posts', 'row')
 def handler(node):
+    post_type_id = node.attributes['PostTypeId']
     id = node.attributes['Id']
     body = node.attributes['Body']
 
-    try:
-        tags = node.attributes['Tags']
-    except KeyError:
-        tags = 'N/A'
+    # question
+    if post_type_id == '1':
+        try:
+            tags = node.attributes['Tags']
 
-    try:
-        parent_id = node.attributes['ParentId']
-    except KeyError:
-        parent_id = 'N/A'
+            yield {
+                'post_type_id': post_type_id,
+                'id': id,
+                'body': body,
+                'tags': tags,
+            }
+        except KeyError:
+            yield 'N/A'
 
-    try:
-        accepted_answer_id = node.attributes['AcceptedAnswerId']
-    except KeyError:
-        accepted_answer_id = 'N/A'
-    
-    yield {
-        'id': id,
-        'body': body,
-        'tags': tags,
-        'parent_id': parent_id,
-        'accepted_answer_id': accepted_answer_id
-    }
+    # answer
+    elif post_type_id == '2':
+        try:
+            parent_id = node.attributes['ParentId']
+
+            yield {
+                'post_type_id': post_type_id,
+                'id': id,
+                'body': body,
+                'parent_id': parent_id
+            }
+        except KeyError:
+            yield 'N/A'
+    else:
+        yield 'N/A'
 
 def is_question_tagged_postgresql(postgresql_tags: list, question_tags: str) -> bool:
     correct = False
@@ -83,12 +91,16 @@ def filter_postgresql_questions(file_name: str) -> None:
         rows = XML_file.readlines(1000000000)
 
         # todo - encoding to utf8 for each readlines (insert header into list)
-        while len(rows) > 1:
-            rows.append(b'</posts>')
+        while len(rows) > 2:
+            if rows[len(rows) - 1] != b'</posts>':
+                rows.append(b'</posts>')
             
             for item in Parser(rows).iter_from(handler):
                 # answer
-                if item['tags'] == 'N/A':
+                if item == 'N/A':
+                    continue
+
+                if item['post_type_id'] == '2':
                     output_file_all_answers.write(str(item) + '\n')
                     continue
                 
@@ -97,7 +109,8 @@ def filter_postgresql_questions(file_name: str) -> None:
                     output_file_questions.write(str(item) + '\n')
 
             rows = XML_file.readlines(1000000000)
-            rows.insert(0, b'<posts>')
+            rows.insert(0, b'<?xml version="1.0" encoding="utf-8"?>')
+            rows.insert(1, b'<posts>')
 
     output_file_questions.close()
     output_file_all_answers.close()
@@ -107,22 +120,34 @@ def get_questions() -> list:
     result = []
 
     for row in input_file_questions:
-        id_body = re.search("{'id': '(.+?)', 'body': '(.+?)'", row)
+        id_body = re.search("{'post_type_id': '1', 'id': '(.+?)', 'body': (.+?), 'tags'", row)
 
         if not id_body:
             print('Failed to read question from file!')
             continue
         
         tuple_id_body = id_body.group(1, 2)
-        result.append(tuple_id_body)
+        result.append(('1') + tuple_id_body)
 
     input_file_questions.close()
     return result
 
-# not tested
-def link_questions_with_answers(questions: list) -> dict:
+def save_linked(linked_questions_answers: dict) -> None:
+    output_file = open('D:\\final.txt', 'a', encoding='utf8')
+
+    for question, answers in linked_questions_answers.items():
+        output_file.write(str(question) + '\n')
+
+        for answer in answers:
+            output_file.write(str(answer) + '\n')
+
+    output_file.close()
+
+def link_questions_with_answers(questions: list) -> None:
     input_file_answers = open('D:\\all_answers.txt', 'r', encoding='utf8')
     result = {}
+
+    questions.sort(key = lambda x: int(x[0]))
 
     for tuple_key in questions:
         result[tuple_key] = []
@@ -130,8 +155,10 @@ def link_questions_with_answers(questions: list) -> dict:
     rows = input_file_answers.readlines(1000000000)
 
     while len(rows) > 0:
+        print(f'First element: {rows[0]}')
+        print(f'Last element: {rows[-1]}')
         for answer in rows:
-            id_body_parent = re.search("{'id': '(.+?)', 'body': '(.+?)', 'tags': 'N/A', 'parent_id': '(.+?)'", answer)
+            id_body_parent = re.search("{'post_type_id': '2', 'id': '(.+?)', 'body': (.+?), 'parent_id': '(.+?)'", answer)
 
             if not id_body_parent:
                 print('Failed to read answer from file!')
@@ -141,18 +168,40 @@ def link_questions_with_answers(questions: list) -> dict:
 
             for key in result:
                 if key[0] == tuple_id_body_parent[2]:
-                    result[key].append(tuple_id_body_parent)
+                    result[key].append(('2') + tuple_id_body_parent)
+                    break
+
+                if int(key[0]) > int(tuple_id_body_parent[2]):
                     break
 
         rows = input_file_answers.readlines(1000000000)
 
     input_file_answers.close()
+
+    save_linked(result)
+    print('Done successfully! :)')
     return result
 
-#{'id': id, 'body': body, 'tags': tags, 'parent_id': parent_id, 'accepted_answer_id': accepted_answer_id}
+def retrieve_linked() -> dict:
+    input_file = open('D:\\final.txt', 'a', encoding='utf8')
+    result = {}
 
+    row = input_file.readline()
+    current = -1
+
+    while row:
+        row_tuple = eval(row)
+        if row_tuple[0] == '1':
+            current = row_tuple[1::]
+            result[current] = []
+        else:
+            result[current].append(row_tuple[1::])
+
+    input_file.close()
+    return result
 
 if __name__ == "__main__":
     # filter_postgresql_questions('D:\stackoverflow.com\Posts.xml')
-    questions = get_questions()
-    # questions_answers = link_questions_with_answers(get_questions)
+    # print(len(get_questions())) # 180282
+    # link_questions_with_answers(get_questions())
+    questions_answers = retrieve_linked()

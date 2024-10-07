@@ -32,3 +32,32 @@ def test_dict_tuple_key() -> None:
 
     print(result)
     print(type(result))
+
+def wtha():
+    with open('D:\\all_answers.txt', 'r', encoding='utf8') as f:
+        for row in f:
+            row_tmp = eval(row)
+            if row_tmp['id'] == '4416':
+                print(row)
+
+def testing():
+    with open('C:\\Users\\Hecko\\Desktop\\tmp.txt', 'w', encoding='utf8') as output_fule:
+        output_fule.write(str(('1', 'Hello1')) + '\n')
+        output_fule.write(str(('2', 'Hello2')) + '\n')
+        output_fule.write(str(('2', 'Hello3')) + '\n')
+        output_fule.write(str(('1', 'Hello4')) + '\n')
+        output_fule.write(str(('2', 'Hello5')) + '\n')
+
+    result = {}
+    with open('C:\\Users\\Hecko\\Desktop\\tmp.txt', 'r', encoding='utf8') as input_fule:
+        row = input_fule.readline()
+        current = eval(row)[1]
+        while row:
+            if (eval(row)[0] == '1'):
+                current = eval(row)[1]
+                result[current] = []
+            else:
+                result[current].append(eval(row))
+            row = input_fule.readline()
+    
+    print(result)
