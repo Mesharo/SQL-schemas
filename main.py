@@ -127,7 +127,7 @@ def get_questions() -> list:
             continue
         
         tuple_id_body = id_body.group(1, 2)
-        result.append(('1') + tuple_id_body)
+        result.append(('1',) + tuple_id_body)
 
     input_file_questions.close()
     return result
@@ -147,16 +147,16 @@ def link_questions_with_answers(questions: list) -> None:
     input_file_answers = open('D:\\all_answers.txt', 'r', encoding='utf8')
     result = {}
 
-    questions.sort(key = lambda x: int(x[0]))
+    questions.sort(key = lambda x: int(x[1]))
 
     for tuple_key in questions:
-        result[tuple_key] = []
+        result[tuple_key[1]] = []
 
     rows = input_file_answers.readlines(1000000000)
 
     while len(rows) > 0:
-        print(f'First element: {rows[0]}')
-        print(f'Last element: {rows[-1]}')
+        print(f'Start: {rows[0]}')
+        print(f'End: {rows[-1]}')
         for answer in rows:
             id_body_parent = re.search("{'post_type_id': '2', 'id': '(.+?)', 'body': (.+?), 'parent_id': '(.+?)'", answer)
 
@@ -166,24 +166,21 @@ def link_questions_with_answers(questions: list) -> None:
 
             tuple_id_body_parent = id_body_parent.group(1, 2, 3)
 
-            for key in result:
-                if key[0] == tuple_id_body_parent[2]:
-                    result[key].append(('2') + tuple_id_body_parent)
-                    break
-
-                if int(key[0]) > int(tuple_id_body_parent[2]):
-                    break
+            if result.get(tuple_id_body_parent[2]) is not None:
+                result[tuple_id_body_parent[2]].append(('2',) + tuple_id_body_parent)
+                # (2, id, body, parent_id)
 
         rows = input_file_answers.readlines(1000000000)
 
     input_file_answers.close()
 
+    result = dict(zip(questions, result.values()))
     save_linked(result)
-    print('Done successfully! :)')
+
     return result
 
 def retrieve_linked() -> dict:
-    input_file = open('D:\\final.txt', 'a', encoding='utf8')
+    input_file = open('D:\\final.txt', 'r', encoding='utf8')
     result = {}
 
     row = input_file.readline()
@@ -196,6 +193,8 @@ def retrieve_linked() -> dict:
             result[current] = []
         else:
             result[current].append(row_tuple[1::])
+        
+        row = input_file.readline()
 
     input_file.close()
     return result

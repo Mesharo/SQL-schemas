@@ -61,3 +61,19 @@ def testing():
             row = input_fule.readline()
     
     print(result)
+
+def testing2():
+    questions = [('1', 'hello', 'yush')]
+    mydict = {
+        ('1', '2'): "any",
+        ('2', '3'): "any2",
+        ('3', '4'): "any3",
+        ('4', '5'): "any4",
+        ('5', '6'): "any5",
+    }
+
+    print(mydict)
+
+    mydict = dict(zip(questions, mydict.values()))
+
+    print(mydict)
