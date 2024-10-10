@@ -1,13 +1,15 @@
 import re
 from bigxml import Parser, xml_handle_element
-import time
 
-from tests import *
-
-# wanna find postgresql and postgresql-version tags
-def get_postgresql_tags(file_name: str) -> list:
+def get_postgresql_tags(input_filepath_tags_xml: str) -> list:
+    """Return a list of wanted postgresql tags.
+    
+    Argument:
+    input_filepath_tags_xml -- path to the Tags.xml from Stackoverflow's data dump.
+    """
+    
     result = []
-    file = open(file_name, 'r', encoding='utf8')
+    file = open(input_filepath_tags_xml, 'r', encoding='utf8')
 
     for row in file:
         id_tagname = re.search('<row Id="(.+?)" TagName="(.+?)"', row)
@@ -38,6 +40,11 @@ def get_postgresql_tags(file_name: str) -> list:
 
 @xml_handle_element('posts', 'row')
 def handler(node):
+    """Handler for BigXML parser.
+    
+    Function which parses the XML row and
+    yields user-defined structure.
+    """
     post_type_id = node.attributes['PostTypeId']
     id = node.attributes['Id']
     body = node.attributes['Body']
@@ -73,6 +80,15 @@ def handler(node):
         yield 'N/A'
 
 def is_question_tagged_postgresql(postgresql_tags: list, question_tags: str) -> bool:
+    """
+    Check for postgresql tags.
+    Return true when found.
+
+    Arguments:
+    postgresql_tags -- list of wanted postgresql tags ('postgresql', versions).
+    question_tags -- string of the current question's tags.
+    """
+    
     correct = False
     for tag in postgresql_tags:
         if tag in question_tags:
@@ -80,17 +96,29 @@ def is_question_tagged_postgresql(postgresql_tags: list, question_tags: str) -> 
             break
     return correct
 
-# filter out wanted questions and save them in a separate file for quicker access
-def filter_postgresql_questions(file_name: str) -> None:
-    postgresql_tags = get_postgresql_tags('D:\stackoverflow.com\Tags.xml')
-    output_file_questions = open('D:\postgresql_questions.txt', 'a', encoding='utf8')
-    output_file_all_answers = open('D:\\all_answers.txt', 'a', encoding='utf8')
+def filter_postgresql_questions(input_filepath_posts_xml: str, input_filepath_tags_xml: str, output_filepath_questions: str, output_filepath_answers: str) -> None:
+    """Filter out postgresql questions.
+    
+    Read posts from a file by doses (1GB).
+    Let parser and handler yield row values in expected structure.
+    Distinguish between questions and answers.
+    Check for postgresql tags, save if found. 
 
-    with open(file_name, 'rb') as XML_file:
+    Arguments:
+    input_filepath_posts_xml -- path to the Posts.xml from Stackoverflow's data dump.
+    input_filepath_tags_xml -- path to the Tags.xml from Stackoverflow's data dump.
+    output_filepath_questions -- path where we save filtered questions.
+    output_filepath_answers -- path where we save all answers.
+    """
+
+    postgresql_tags = get_postgresql_tags(input_filepath_tags_xml)
+    output_file_questions = open(output_filepath_questions, 'a', encoding='utf8')
+    output_file_all_answers = open(output_filepath_answers, 'a', encoding='utf8')
+
+    with open(input_filepath_posts_xml, 'rb') as XML_file:
 
         rows = XML_file.readlines(1000000000)
 
-        # todo - encoding to utf8 for each readlines (insert header into list)
         while len(rows) > 2:
             if rows[len(rows) - 1] != b'</posts>':
                 rows.append(b'</posts>')
@@ -115,8 +143,15 @@ def filter_postgresql_questions(file_name: str) -> None:
     output_file_questions.close()
     output_file_all_answers.close()
 
-def get_questions() -> list:
-    input_file_questions = open('D:\postgresql_questions.txt', 'r', encoding='utf8')
+def get_questions(input_filepath_questions) -> list:
+    """
+    Read postgresql questions into a list, represented as tuples.
+
+    Argument:
+    input_filepath_questions -- path to the file with postgresql questions.
+    """
+    
+    input_file_questions = open(input_filepath_questions, 'r', encoding='utf8')
     result = []
 
     for row in input_file_questions:
@@ -132,8 +167,16 @@ def get_questions() -> list:
     input_file_questions.close()
     return result
 
-def save_linked(linked_questions_answers: dict) -> None:
-    output_file = open('D:\\final.txt', 'a', encoding='utf8')
+def save_linked(output_filepath: str, linked_questions_answers: dict) -> None:
+    """
+    Write linked postgresql questions with their answers into a file.
+
+    Arguments:
+    output_filepath -- path where we want to save everything.
+    linked_questions_answers -- dictionary with questions as keys and lists of answers as values
+    """
+
+    output_file = open(output_filepath, 'a', encoding='utf8')
 
     for question, answers in linked_questions_answers.items():
         output_file.write(str(question) + '\n')
@@ -143,8 +186,20 @@ def save_linked(linked_questions_answers: dict) -> None:
 
     output_file.close()
 
-def link_questions_with_answers(questions: list) -> None:
-    input_file_answers = open('D:\\all_answers.txt', 'r', encoding='utf8')
+def link_questions_with_answers(input_filepath_answers: str, questions: list) -> None:
+    """Link postgresql questions with corresponding answers.
+    
+    Sort postgresql question based on their ID.
+    Load answers, check their parent_id attribute.
+    Link postgresql answers to their questions.
+    Call function save_linked(result: dict) to save all into a file.
+
+    Arguments:
+    input_filepath_answers -- path to the file with answers.
+    questions -- list with postgresql questions, represented as tuples.
+    """
+
+    input_file_answers = open(input_filepath_answers, 'r', encoding='utf8')
     result = {}
 
     questions.sort(key = lambda x: int(x[1]))
@@ -155,8 +210,6 @@ def link_questions_with_answers(questions: list) -> None:
     rows = input_file_answers.readlines(1000000000)
 
     while len(rows) > 0:
-        print(f'Start: {rows[0]}')
-        print(f'End: {rows[-1]}')
         for answer in rows:
             id_body_parent = re.search("{'post_type_id': '2', 'id': '(.+?)', 'body': (.+?), 'parent_id': '(.+?)'", answer)
 
@@ -168,7 +221,6 @@ def link_questions_with_answers(questions: list) -> None:
 
             if result.get(tuple_id_body_parent[2]) is not None:
                 result[tuple_id_body_parent[2]].append(('2',) + tuple_id_body_parent)
-                # (2, id, body, parent_id)
 
         rows = input_file_answers.readlines(1000000000)
 
@@ -179,8 +231,17 @@ def link_questions_with_answers(questions: list) -> None:
 
     return result
 
-def retrieve_linked() -> dict:
-    input_file = open('D:\\final.txt', 'r', encoding='utf8')
+def retrieve_linked(input_filepath_linked: str) -> dict:
+    """Get questions and answers.
+    
+    Read saved postgresql questions with their corresponding
+    answers from a file into a dictionary.
+
+    Argument:
+    input_filepath_linked -- path to the file with questions and answers.
+    """
+
+    input_file = open(input_filepath_linked, 'r', encoding='utf8')
     result = {}
 
     row = input_file.readline()
@@ -200,7 +261,4 @@ def retrieve_linked() -> dict:
     return result
 
 if __name__ == "__main__":
-    # filter_postgresql_questions('D:\stackoverflow.com\Posts.xml')
-    # print(len(get_questions())) # 180282
-    # link_questions_with_answers(get_questions())
-    questions_answers = retrieve_linked()
+    questions_answers = retrieve_linked('D:\\final.txt')
