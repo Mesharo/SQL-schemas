@@ -291,31 +291,3 @@ def find_code_section(linked: dict) -> dict:
         result[question[0]] = list_of_questions_list
 
     return result
-
-
-if __name__ == "__main__":
-    questions_answers = retrieve_linked('D:\\final.txt')
-    codes = find_code_section(questions_answers)
-    print(codes)
-
-
-#TODO vyhodit html charaktery, \s apod.
-#TODO rozchodit antlr4 pro postgresql
-    """
-'\'<p>For example, you create <code>person</code> table, then insert 2 rows into it as shown
-below.</p>\\n<pre class="lang-sql prettyprint-override"><code>CREATE TABLE person (\\n  id INTEGER,\\n  
-ame VARCHAR(20)\\n);\\n\\nINSERT INTO person (id, name) \\nVALUES (1, \\\'John\\\'), (2, \\\'David\\\');
-\\n</code></pre>\\n<p>Next, you create <code>log</code> table, then you insert the row whose <code>num
-</code> is <code>0</code> into <code>log</code> table as shown below:</p>\\n<pre class="lang-sql
-prettyprint-override"><code>CREATE TABLE log (\\n  num INTEGER\\n);\\n\\nINSERT INTO log (num) VALUES
-(0);\\n</code></pre>\\n<p>Now, you can create <code>my_func()</code> trigger function with <code>RETURNS
-trigger</code> and <code>LANGUAGE plpgsql</code> which increments <code>num</code> by 1 as shown below:
-</p>\\n<pre class="lang-sql prettyprint-override"><code>CREATE FUNCTION my_func() RETURNS trigger\\nAS
-$$\\nBEGIN\\n  UPDATE log SET num = num + 1;\\n  RETURN NULL;\\nEND;\\n$$ LANGUAGE plpgsql;\\n</code>
-</pre>\\n<p>Next, you create <code>my_v</code> view as shown below.</p>\\n<pre class="lang-sql
-prettyprint-override"><code>CREATE VIEW my_v AS\\n  SELECT * FROM person;\\n</code></pre>\\n<p>Now,
-you can create <code>my_t</code> trigger which runs <code>my_func()</code> when <code>UPDATE</code> or
-<code>DELETE</code> operation is prevented on <code>my_view</code>
-
-@&gt;
-    """
