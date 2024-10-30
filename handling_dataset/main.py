@@ -167,7 +167,7 @@ def get_questions(input_filepath_questions) -> list:
     input_file_questions.close()
     return result
 
-def save_linked(output_filepath: str, linked_questions_answers: dict) -> None:
+def save_linked(output_filepath_linked: str, linked_questions_answers: dict) -> None:
     """
     Write linked postgresql questions with their answers into a file.
 
@@ -176,7 +176,7 @@ def save_linked(output_filepath: str, linked_questions_answers: dict) -> None:
     linked_questions_answers -- dictionary with questions as keys and lists of answers as values
     """
 
-    output_file = open(output_filepath, 'a', encoding='utf8')
+    output_file = open(output_filepath_linked, 'a', encoding='utf8')
 
     for question, answers in linked_questions_answers.items():
         output_file.write(str(question) + '\n')
@@ -186,7 +186,7 @@ def save_linked(output_filepath: str, linked_questions_answers: dict) -> None:
 
     output_file.close()
 
-def link_questions_with_answers(input_filepath_answers: str, questions: list) -> None:
+def link_questions_with_answers(input_filepath_answers: str, questions: list, output_filepath_linked: str) -> None:
     """Link postgresql questions with corresponding answers.
     
     Sort postgresql question based on their ID.
@@ -227,11 +227,9 @@ def link_questions_with_answers(input_filepath_answers: str, questions: list) ->
     input_file_answers.close()
 
     result = dict(zip(questions, result.values()))
-    save_linked(result)
+    save_linked(output_filepath_linked, result)
 
-    return result
-
-def retrieve_linked(input_filepath_linked: str) -> dict:
+def load_linked(input_filepath_linked: str) -> dict:
     """Get questions and answers.
     
     Read saved postgresql questions with their corresponding
@@ -289,5 +287,43 @@ def find_code_section(linked: dict) -> dict:
                 list_of_questions_list.append(list_code_answer)
 
         result[question[0]] = list_of_questions_list
+
+    return result
+
+def save_code_sections(input_filepath_linked: str, output_filepath_codes: str) -> None:
+    """Save codes into file.
+    
+    Save codes into a file in the form of tuple.
+    First element is id of question.
+    Second element is a list of lists containing separate code sections.
+
+    Arguments:
+    input_filepath_linked -- path to the file with questions and answers.
+    output_filepath_codes -- path to where we want to save the codes.
+    """
+
+    codes = find_code_section(load_linked(input_filepath_linked))
+
+    with open(output_filepath_codes, 'a', encoding='utf8') as f:
+        for key, values in codes.items():
+            f.write(str((key, values)) + '\n')
+
+def load_code_sections(input_filepath_codes: str) -> dict:
+    """Load codes from file.
+    
+    Return dictionary.
+    Key is id of question.
+    Values is a list of lists containing separate code sections.
+
+    Argument:
+    input_filepath_codes -- path to the file with code sections.
+    """
+
+    result = {}
+
+    with open(input_filepath_codes, 'r', encoding='utf8') as f:
+        while line := f.readline():
+            tmp = eval(line.rstrip())
+            result[tmp[0]] = tmp[1]
 
     return result

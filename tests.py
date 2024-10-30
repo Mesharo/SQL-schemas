@@ -78,7 +78,6 @@ def testing2():
 
     print(mydict)
 
-
 import sqlparse
 def erasing_backslashes():
     xd = """SELECT \\\'ALTER TABLE "\\\'||nspname||\\\'"."\\\'||relname||\\\'" DROP CONSTRAINT "\\\'||conname||\\\'";\\\'
@@ -102,3 +101,75 @@ def erasing_backslashes():
             print('Tokens: ')
             for token in statement.tokens:
                 print(f'    - {token}')
+
+from sql_metadata import Parser
+def sqlmetadata():
+    try:
+        print(Parser('TABLE hello').tables)
+    except ValueError:
+        print('Disgustingly dumb user')
+    print(Parser("SELECT a, b + 1 AS c FROM d").columns_aliases)
+
+    print('--- NEXT ---')
+
+    print(Parser("CREATE TABLE cars (brand VARCHAR(255),model VARCHAR(255),year INT);").tables)
+    print(Parser("CREATE TABLE cars (brand VARCHAR(255),model VARCHAR(255),year INT);").columns)
+
+import sqlglot
+import sqlglot.optimizer
+import sqlglot.optimizer.qualify
+def sqlglottry():
+    for column in sqlglot.parse_one("""
+insert into EscapeTest (text) values (E'This is the first part 
+ And this is the second');
+ insert into EscapeTest (text) values (E'This is the first part 
+ And this is the second');
+""").find_all(sqlglot.exp.Table):
+        print(column.alias_or_name)
+    
+    print('--- NEXT ---')
+
+    statement = "CREATE TABLE cars (brand VARCHAR(255),model VARCHAR(255),year INT);"
+    for column in sqlglot.parse_one(statement, dialect="postgres").find_all(sqlglot.exp.Column):
+        print(column.alias_or_name)
+
+import copy
+def tmp():
+    expression_tree = sqlglot.parse_one("""
+                                        SELECT
+                                        a,
+                                        c
+                                        FROM (
+                                        SELECT
+                                            a,
+                                            b
+                                        FROM x
+                                        ) AS x
+                                        JOIN (
+                                        SELECT
+                                            b,
+                                            c
+                                        FROM y
+                                        ) AS y
+                                        ON x.b = y.b
+                                        """,
+                                        dialect="postgres")
+
+    solved = False
+    try:
+        undo = copy.deepcopy(expression_tree)
+        sqlglot.optimizer.qualify.qualify(expression_tree)
+
+        root = sqlglot.optimizer.build_scope(expression_tree)
+        for column in sqlglot.optimizer.find_all_in_scope(root.expression, sqlglot.exp.Column):
+            print(f"{column} => {root.sources[column.table]}")
+
+        solved = True
+    except sqlglot.errors.OptimizeError:
+        expression_tree = undo
+
+if __name__ == '__main__':
+    #print('SQLMETADATA: ')
+    #sqlmetadata()
+
+    tmp()
