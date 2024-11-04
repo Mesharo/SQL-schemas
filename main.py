@@ -5,6 +5,7 @@ import re
 import os.path
 import sqlglot
 import copy
+import config
 
 from io import StringIO
 from html.parser import HTMLParser
@@ -47,43 +48,28 @@ def erase_html(code_section: str) -> str:
 
 
 
-def analyze(id: str, codes: list) -> None:
-    print('CODES: ')
+def analyze(id: str, codes: list) -> tuple:
+    parsed = 0
+    not_parsed = 0
     for code in codes:
         code = erase_html(code)
 
-        #print(f'-- code: {code}')
-        expression_tree = False
+        correct = False
         try:
-            expression_trees = sqlglot.parse(code, dialect='postgres')
+            expression_tree = sqlglot.parse(code, dialect='postgres')
+            correct = True
         except sqlglot.errors.ParseError:
-            #print(f'Sqlglot failed to parse given statement')
-            continue
+            correct = False
         except sqlglot.errors.TokenError:
-            #print(f'Sqlglot failed to tokenize given statement')
-            continue
+            correct = False
+        except:
+            correct = False
 
-        for expression_tree in expression_trees:
-            #print(f'-- tree: {repr(expression_tree)}')
-            
-            solved = False
-            try:
-                undo = copy.deepcopy(expression_tree)
-                sqlglot.optimizer.qualify.qualify(expression_tree)
-
-                root = sqlglot.optimizer.build_scope(expression_tree)
-                
-                if root:
-                    for column in sqlglot.optimizer.find_all_in_scope(root.expression, sqlglot.exp.Column):
-                        print(f"{column} => {root.sources[column.table]}")
-
-                solved = True
-            except sqlglot.errors.OptimizeError:
-                #print(f'Sqlglot failed to optimize given statement.')
-                expression_tree = undo
-                continue
-        
-    print('--- --- ---')
+        if correct:
+            parsed += 1
+        else:
+            not_parsed += 1     
+    return (parsed, not_parsed)
 
 
 def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: str, input_filepath_linked: str, input_filepath_codes: str) -> None:
@@ -103,10 +89,16 @@ def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: st
     if os.path.isfile(input_filepath_codes):
         codes = load_code_sections(input_filepath_codes)
         count = 0
+        parsed = 0
+        not_parsed = 0
         for key, values in codes.items():
-            if count < 6:
-                analyze(key, values)
+            if count < 1000:
+                tmp = analyze(key, values)
+                parsed += tmp[0]
+                not_parsed += tmp[1]
                 count += 1
+        print(f'Parsed: {parsed}, not parsed: {not_parsed}')
+        # Parsed: 931, not parsed: 1802
         return
 
     if os.path.isfile(input_filepath_linked):
@@ -119,7 +111,7 @@ def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: st
         run(input_filepath_all_answers, input_filepath_postgresql_questions, input_filepath_linked, input_filepath_codes)
     
     # creates input_filepath_all_answers, input_filepath_postgresql_questions
-    filter_postgresql_questions('D:\\stackoverflow\\Posts.xml', 'D:\\stackoverflow\\Tags.xml', input_filepath_postgresql_questions, input_filepath_all_answers)
+    filter_postgresql_questions(config.filepaths['posts'], config.filepaths['tags'], input_filepath_postgresql_questions, input_filepath_all_answers)
     # creates input_filepath_linked
     link_questions_with_answers(input_filepath_all_answers, get_questions(input_filepath_postgresql_questions), input_filepath_linked)
     #creates input_filepath_codes
@@ -128,16 +120,14 @@ def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: st
     run(input_filepath_all_answers, input_filepath_postgresql_questions, input_filepath_linked, input_filepath_codes)
 
 if __name__ == "__main__":
-    run('D:\\all_answers', 'D:\\postgresql_questions.txt', 'D:\\linked.txt', 'D:\\codes.txt')
+    run(config.filepaths['all_answers'], config.filepaths['postgresql_questions'], config.filepaths['linked'], config.filepaths['codes'])
     
 
 """
 DONE:
-    1. Kapitola ohledně výběru parseru (stránka 10)
-    2. Automatizace/serializace na základě aktuálního progresu
-    partially 3. Parser - tabulky s jejich aliasy
-
-OTÁZKY:
-    1. zahodit pokud sqlglot nedokáže qualify?
-    2. cíl bakalářky - knihovna
+    1. config file, soubory do files/
+    2. struktura kapitoly, nová kapitola ohledně schémat
+    3. test na větším počtu
 """
+
+#TODO Fix analyze()
