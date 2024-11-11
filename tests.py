@@ -168,8 +168,18 @@ def tmp():
     except sqlglot.errors.OptimizeError:
         expression_tree = undo
 
-if __name__ == '__main__':
-    #print('SQLMETADATA: ')
-    #sqlmetadata()
+def whatever():
+    expr = "SELECT hello FROM y;"
+    expr_split = expr.split(';')
+    for exp in expr_split:
+        try:
+            expression_tree = sqlglot.parse(exp)
+            print(repr(expression_tree))
+            if expression_tree == [None]:
+                print('is None')
 
-    tmp()
+        except sqlglot.errors.ParseError as pe:
+            print(f'ParseError: {pe}')
+
+if __name__ == '__main__':
+    whatever()
