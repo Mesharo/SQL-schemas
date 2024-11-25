@@ -1,12 +1,12 @@
 import sqlglot.dialects
 import sqlglot.dialects.dialect
+import sqlglot.errors
 import sqlglot.optimizer
 import sqlglot.optimizer.qualify
 from handling_dataset.main import filter_postgresql_questions, load_code_sections, get_questions, link_questions_with_answers, save_code_sections
 import re
 import os.path
 import sqlglot
-import copy
 import config
 
 from io import StringIO
@@ -98,6 +98,7 @@ def analyze(id: str, codes: list) -> tuple:
     parsed = 0
     not_parsed = 0
     is_none = 0
+    not_empty_columns_tables_aliases = 0
     for code_list in codes:
         all_codes_string = erase_html(code_list)
         for code in all_codes_string.split(';'):
@@ -109,6 +110,24 @@ def analyze(id: str, codes: list) -> tuple:
                 expression_tree = sqlglot.parse(code, dialect='postgres')
                 if expression_tree == [None]:
                     is_none += 1
+                    correct = True
+                    continue
+                
+                for ast in expression_tree:
+                    columns = ast.find_all(sqlglot.exp.Column)
+                    tables = ast.find_all(sqlglot.exp.Table)
+                    aliases = ast.find_all(sqlglot.exp.Alias)
+                    
+                    if next(columns, None) is not None:
+                        not_empty_columns_tables_aliases += 1
+                        continue
+                    if next(tables, None) is not None:
+                        not_empty_columns_tables_aliases += 1
+                        continue
+                    if next(aliases, None) is not None:
+                        not_empty_columns_tables_aliases += 1
+                        continue
+
                 correct = True
             except sqlglot.errors.ParseError as pe:
                 correct = False
@@ -116,6 +135,9 @@ def analyze(id: str, codes: list) -> tuple:
             except sqlglot.errors.TokenError as te:
                 correct = False
                 #print(f'----\nTokenError: {te}\n-----')
+            except sqlglot.errors.OptimizeError as oe:
+                correct = False
+                #print(f'----\nOptimizeError: {oe}\n-----')
             except:
                 correct = False
 
@@ -124,7 +146,7 @@ def analyze(id: str, codes: list) -> tuple:
             else:
                 not_parsed += 1   
 
-    return (parsed, not_parsed, is_none)
+    return (parsed, not_parsed, is_none, not_empty_columns_tables_aliases)
 
 def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: str, input_filepath_linked: str, input_filepath_codes: str) -> None:
     """Main function.
@@ -145,6 +167,7 @@ def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: st
         parsed = 0
         not_parsed = 0
         is_none = 0
+        not_empty_columns_tables_aliases = 0
 
         for key, values in codes.items():
             if not values:
@@ -154,18 +177,12 @@ def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: st
             parsed += tmp[0]
             not_parsed += tmp[1]
             is_none += tmp[2]
+            not_empty_columns_tables_aliases += tmp[3]
             
-        print(f'Parsed: {parsed}, not parsed: {not_parsed}, None: {is_none} (included in Parsed)')
+        print(f'Parsed: {parsed}, not parsed: {not_parsed}, None: {is_none} (included in Parsed), Found col/table/alias: {not_empty_columns_tables_aliases}')
         print('DONE!')
-        # Parsed: 931, not parsed: 1802 (původně)
-        # Parsed: 1122, not parsed: 2251 (ignor prázdných)
-        # Parsed: 5189, not parsed: 3887 (split na sekce, bez dialektu postgres)
-        # Parsed: 9723, not parsed: 6415 (split ;)
-        # Parsed: 9769, not parsed: 6369 (E' -> ', no `)
-
-        # Parsed: 9571, not parsed: 6567 (added dialect='postgres')
-        # Parsed: 1192213, not parsed: 886185 (all)
-        # Parsed: 1192213, not parsed: 886185, None: 198696 (included in Parsed)
+        # new dataset: Parsed: 424400, not parsed: 201498, None: 80004 (included in Parsed)
+        # Parsed: 344396, not parsed: 201498, None: 80004 (not included in Parsed), Found col/table/alias: 280418
         return
 
     if os.path.isfile(input_filepath_linked):
@@ -188,14 +205,3 @@ def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: st
 if __name__ == "__main__":
     run(config.filepaths['all_answers'], config.filepaths['postgresql_questions'], config.filepaths['linked'], config.filepaths['codes'])
     
-
-"""
-DONE:
-    1. config file, soubory do files/
-    2. struktura kapitoly, nová kapitola ohledně schémat
-    3. test na větším počtu
-
-    - PL/pgSQL zahazuju (DECLARE @OuterPageSize int)
-"""
-
-#TODO Fix analyze()

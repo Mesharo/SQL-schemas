@@ -78,6 +78,7 @@ def testing2():
 
     print(mydict)
 
+import sqlglot.optimizer.scope
 import sqlparse
 def erasing_backslashes():
     xd = """SELECT \\\'ALTER TABLE "\\\'||nspname||\\\'"."\\\'||relname||\\\'" DROP CONSTRAINT "\\\'||conname||\\\'";\\\'
@@ -118,6 +119,7 @@ def sqlmetadata():
 import sqlglot
 import sqlglot.optimizer
 import sqlglot.optimizer.qualify
+from sqlglot import exp
 def sqlglottry():
     for column in sqlglot.parse_one("""
 insert into EscapeTest (text) values (E'This is the first part 
@@ -169,17 +171,65 @@ def tmp():
         expression_tree = undo
 
 def whatever():
-    expr = "SELECT hello FROM y;"
-    expr_split = expr.split(';')
-    for exp in expr_split:
-        try:
-            expression_tree = sqlglot.parse(exp)
-            print(repr(expression_tree))
-            if expression_tree == [None]:
-                print('is None')
+    expr = "SELECT xd.hello FROM y AS xd"
+    try:
+        expression_tree = sqlglot.parse(expr)
+        print(repr(expression_tree))
+                
+        for tmp in expression_tree:
+            columns = tmp.find_all(exp.Column)
+            tables = tmp.find_all(exp.Table)
+            aliases = tmp.find_all(exp.Alias)
 
-        except sqlglot.errors.ParseError as pe:
-            print(f'ParseError: {pe}')
+            print('Columns!')
+            for column in columns:
+                print(column.name)
+
+            print('Tables!')
+            for table in tables:
+                print(table.name)
+
+            print('Aliases!')
+            for alias in aliases:
+                print(alias.name)
+        
+        """
+        for node in expression_tree.args['expressions']:
+            if isinstance(node, exp.Column):
+                if (node.args['this']):
+                    print(f'Column name: {node.args["this"]}')
+                if (node.args['table']):
+                    print(f'from table: {node.args["table"]}')
+            
+            if isinstance(node, exp.Alias):
+                if (node.args['this']):
+                    print(f'Column name: {node.args["this"]}')
+
+            if isinstance(node, exp.Table):
+                if (node.args['this']):
+                    print(f'Column name: {node.args["this"]}')
+                if (node.args['alias']):
+                    print(f'from table: {node.args["alias"]}')
+        """
+
+    except sqlglot.errors.ParseError as pe:
+        print(f'ParseError: {pe}')
+
+def test_qualify():
+    statement = "INSERT INTO first VALUES((SELECT hello FROM second), world);"
+
+    try:
+        ASTs = sqlglot.parse(statement)
+        print(repr(ASTs))
+        for AST in ASTs:
+            root = sqlglot.optimizer.scope.build_scope(AST)
+            print(root)
+            for scope in root.traverse():
+                print(scope)
+    except sqlglot.errors.OptimizeError as oe:
+        print(f'----\nOptimizeError: {oe}\n-----')
+
 
 if __name__ == '__main__':
-    whatever()
+    #whatever()
+    test_qualify()

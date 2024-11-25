@@ -89,12 +89,24 @@ def is_question_tagged_postgresql(postgresql_tags: list, question_tags: str) -> 
     question_tags -- string of the current question's tags.
     """
     
-    correct = False
-    for tag in postgresql_tags:
-        if tag in question_tags:
-            correct = True
+    question_tags_split = re.findall('<(.+?)>', question_tags)
+
+    found_sql_tag = False
+    for question_tag in question_tags_split:
+        if question_tag == 'sql':
+            found_sql_tag = True
             break
-    return correct
+
+    if not found_sql_tag:
+        return False
+    
+    question_tags_split.remove('sql')
+    
+    for question_tag in question_tags_split:
+        for postgresql_tag in postgresql_tags:
+            if question_tag == postgresql_tag:
+                return True
+    return False
 
 def filter_postgresql_questions(input_filepath_posts_xml: str, input_filepath_tags_xml: str, output_filepath_questions: str, output_filepath_answers: str) -> None:
     """Filter out postgresql questions.
@@ -327,3 +339,10 @@ def load_code_sections(input_filepath_codes: str) -> dict:
             result[tmp[0]] = tmp[1]
 
     return result
+
+
+
+if __name__ == '__main__':
+    #filter_postgresql_questions('D:\\stackoverflow.com\\Posts.xml', 'D:\\stackoverflow.com\\Tags.xml', 'D:\\postgresql_questions.txt', 'D:\\all_answers.txt')
+    #get_postgresql_tags('D:\\stackoverflow.com\\Tags.xml')
+    pass
