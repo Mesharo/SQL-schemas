@@ -94,59 +94,101 @@ def erase_html(code_section: list) -> str:
 
     return replace_unrecognized_letters(result)
 
+def can_be_parsed(code: str) -> bool:
+    try:
+        expression_tree = sqlglot.parse(code, dialect='postgres')
+
+        if expression_tree == [None]:
+            return False
+
+        return True
+    except:
+        return False
+
+def can_be_scoped(ast) -> bool:
+    try:
+        root = sqlglot.optimizer.scope.build_scope(ast)
+        return True
+    except:
+        return False
+
+def can_be_qualified(ast) -> bool:
+    try:
+        sqlglot.optimizer.qualify.qualify(ast)
+
+        return True
+    except:
+        return False
+
+def solve_with_scopes(ast) -> list:
+    result = []
+    columns = []
+    tables = []
+    aliases = []
+
+    root = sqlglot.optimizer.scope.build_scope(ast)   
+    for scope in root.traverse():
+        pass
+
+def solve_without_scopes(ast) -> list:
+    result = []
+    columns = []
+    tables = []
+    aliases = []
+
+    tmp = list(ast.find_all(sqlglot.exp.Column))
+    for column in tmp:
+        columns.append(str(column))            
+
+    tmp = list(ast.find_all(sqlglot.exp.Table))
+    for table in tmp:
+        tables.append(str(table))
+
+    tmp = list(ast.find_all(sqlglot.exp.Alias))
+    for alias in tmp:
+        aliases.append(str(alias))
+
+    print(f'Cols: {columns}\nTabs: {tables}\nAliases: {aliases}')
+
+    #TODO traversing again using walk and link together
+
+
 def analyze(id: str, codes: list) -> tuple:
-    parsed = 0
-    not_parsed = 0
-    is_none = 0
-    not_empty_columns_tables_aliases = 0
+    result = []
+    columns_tables = []
+
     for code_list in codes:
         all_codes_string = erase_html(code_list)
         for code in all_codes_string.split(';'):
-            #print('----------------------')
-            #print(code)
+            if not can_be_parsed(code):
+                continue
 
-            correct = False
             try:
                 expression_tree = sqlglot.parse(code, dialect='postgres')
-                if expression_tree == [None]:
-                    is_none += 1
-                    correct = True
-                    continue
                 
                 for ast in expression_tree:
-                    columns = ast.find_all(sqlglot.exp.Column)
-                    tables = ast.find_all(sqlglot.exp.Table)
-                    aliases = ast.find_all(sqlglot.exp.Alias)
+                    if (can_be_qualified(ast)):
+                        sqlglot.optimizer.qualify.qualify(ast)
+
+                    if (can_be_scoped(ast)):
+                        columns_tables = solve_with_scopes(ast)
                     
-                    if next(columns, None) is not None:
-                        not_empty_columns_tables_aliases += 1
-                        continue
-                    if next(tables, None) is not None:
-                        not_empty_columns_tables_aliases += 1
-                        continue
-                    if next(aliases, None) is not None:
-                        not_empty_columns_tables_aliases += 1
-                        continue
+                    columns_tables = solve_without_scopes(ast)
 
-                correct = True
+                    if columns_tables:
+                        result.append(columns_tables)
+                        columns_tables.clear()
+
             except sqlglot.errors.ParseError as pe:
-                correct = False
-                #print(f'----\nParseError: {pe}\n-----')
+                continue
             except sqlglot.errors.TokenError as te:
-                correct = False
-                #print(f'----\nTokenError: {te}\n-----')
+                continue
             except sqlglot.errors.OptimizeError as oe:
-                correct = False
-                #print(f'----\nOptimizeError: {oe}\n-----')
+                continue
             except:
-                correct = False
+                continue
 
-            if correct:
-                parsed += 1
-            else:
-                not_parsed += 1   
-
-    return (parsed, not_parsed, is_none, not_empty_columns_tables_aliases)
+    return (id, result)
 
 def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: str, input_filepath_linked: str, input_filepath_codes: str) -> None:
     """Main function.
@@ -164,25 +206,16 @@ def run(input_filepath_all_answers: str, input_filepath_postgresql_questions: st
 
     if os.path.isfile(input_filepath_codes):
         codes = load_code_sections(input_filepath_codes)
-        parsed = 0
-        not_parsed = 0
-        is_none = 0
-        not_empty_columns_tables_aliases = 0
 
+        count = 0
         for key, values in codes.items():
             if not values:
                 continue
-
-            tmp = analyze(key, values)
-            parsed += tmp[0]
-            not_parsed += tmp[1]
-            is_none += tmp[2]
-            not_empty_columns_tables_aliases += tmp[3]
             
-        print(f'Parsed: {parsed}, not parsed: {not_parsed}, None: {is_none} (included in Parsed), Found col/table/alias: {not_empty_columns_tables_aliases}')
-        print('DONE!')
-        # new dataset: Parsed: 424400, not parsed: 201498, None: 80004 (included in Parsed)
-        # Parsed: 344396, not parsed: 201498, None: 80004 (not included in Parsed), Found col/table/alias: 280418
+            while count < 100:
+                tmp = analyze(key, values)
+                print(f'ID: {tmp[0]}, columns and tables: {tmp[1]}')
+
         return
 
     if os.path.isfile(input_filepath_linked):

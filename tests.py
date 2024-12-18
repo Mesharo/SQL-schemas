@@ -78,6 +78,7 @@ def testing2():
 
     print(mydict)
 
+import sqlglot.expressions
 import sqlglot.optimizer.scope
 import sqlparse
 def erasing_backslashes():
@@ -170,66 +171,82 @@ def tmp():
     except sqlglot.errors.OptimizeError:
         expression_tree = undo
 
+def solve_schema(schema: str) -> list:
+    pass
+
+def solve_subquery(subquery: str) -> list:
+    # Rekurze - ast
+    pass
+
 def whatever():
-    expr = "SELECT xd.hello FROM y AS xd"
+    #expr = "SELECT hello FROM a INNER JOIN b;"
+    expr = 'SELECT xd, (SELECT a FROM b) FROM c;'
+    #expr = "INSERT INTO first(xdd, xdd2) VALUES((SELECT x FROM third), 1);"
+    #expr = """WITH x AS (SELECT a FROM y) SELECT a FROM x"""
     try:
         expression_tree = sqlglot.parse(expr)
         print(repr(expression_tree))
                 
-        for tmp in expression_tree:
-            columns = tmp.find_all(exp.Column)
-            tables = tmp.find_all(exp.Table)
-            aliases = tmp.find_all(exp.Alias)
+        for ast in expression_tree:
+            """
+            tmp = list(ast.find_all(sqlglot.exp.Schema))
+            for column in tmp:
+                print(column)  
 
-            print('Columns!')
-            for column in columns:
-                print(column.name)
+            tmp = list(ast.find_all(sqlglot.exp.Column))
+            for column in tmp:
+                columns.append(str(column))            
 
-            print('Tables!')
-            for table in tables:
-                print(table.name)
+            tmp = list(ast.find_all(sqlglot.exp.Table))
+            for table in tmp:
+                tables.append(str(table))
 
-            print('Aliases!')
-            for alias in aliases:
-                print(alias.name)
-        
-        """
-        for node in expression_tree.args['expressions']:
-            if isinstance(node, exp.Column):
-                if (node.args['this']):
-                    print(f'Column name: {node.args["this"]}')
-                if (node.args['table']):
-                    print(f'from table: {node.args["table"]}')
+            tmp = list(ast.find_all(sqlglot.exp.Alias))
+            for alias in tmp:
+                aliases.append(str(alias))"""
             
-            if isinstance(node, exp.Alias):
-                if (node.args['this']):
-                    print(f'Column name: {node.args["this"]}')
+            walk = []
+            sub_result = []
+            
+            tmp = list(ast.find_all(sqlglot.exp.Schema))
+            for schema in tmp:
+                pass
+                #sub_result.append(f'Schema:{solve_schema(schema)}')
+                #ast.args['schema'].replace(sqlglot.exp.Alias(this=sqlglot.exp.Identifier("SOLVED")))
+            #print('first (xdd, xdd2)' == 'first(xdd, xdd2)')
 
-            if isinstance(node, exp.Table):
-                if (node.args['this']):
-                    print(f'Column name: {node.args["this"]}')
-                if (node.args['alias']):
-                    print(f'from table: {node.args["alias"]}')
-        """
+            tmp = list(ast.find_all(sqlglot.exp.Subquery))
+            for subquery in tmp:
+                pass
+                #sub_result.append(f'Subquery:{solve_subquery(subquery)}')
+                #ast.args['subquery'].replace(sqlglot.exp.Alias(this=sqlglot.exp.Identifier("SOLVED")))
+
+            for node in ast.walk(bfs=False):
+                if isinstance(node, sqlglot.expressions.Table):
+                    walk.append(f'Table:{str(node)}')
+                    continue
+                if isinstance(node, sqlglot.expressions.Column):
+                    walk.append(f'Column:{str(node)}')
+                    continue
+                if isinstance(node, sqlglot.expressions.Join):
+                    walk.append(f'Join')
+                    continue
+                #if isinstance(node, sqlglot.expressions.Alias):
+                    #aliases.append(str(node))
+
+        print(expr)
+        print(f'Walk: {walk}')
+        #print(f'Cols: {columns}\nTabs: {tables}\nAliases: {aliases}')
+            
 
     except sqlglot.errors.ParseError as pe:
-        print(f'ParseError: {pe}')
-
-def test_qualify():
-    statement = "INSERT INTO first VALUES((SELECT hello FROM second), world);"
-
-    try:
-        ASTs = sqlglot.parse(statement)
-        print(repr(ASTs))
-        for AST in ASTs:
-            root = sqlglot.optimizer.scope.build_scope(AST)
-            print(root)
-            for scope in root.traverse():
-                print(scope)
+        print(pe)
+    except sqlglot.errors.TokenError as te:
+        print(te)
     except sqlglot.errors.OptimizeError as oe:
-        print(f'----\nOptimizeError: {oe}\n-----')
-
+        print(oe)
+    except:
+        print('GG')
 
 if __name__ == '__main__':
-    #whatever()
-    test_qualify()
+    whatever()
